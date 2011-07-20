@@ -43,7 +43,7 @@ socket_file = Pathname.glob(%w[
 configuration_options = {
   :adapter => 'mysql',
   :username => 'root',
-  :password => 'bvb09dfb',
+  :password => 'secret',
   :database => 'dm_core_test'
 }
 
