@@ -154,7 +154,8 @@ end
 
 c = configuration_options
 
-if sqlfile && File.exists?(sqlfile)
+
+if File.exists?(sqlfile)
 
   printf "\nFound data-file. Importing from #{sqlfile}\n"
   #adapter.execute("LOAD DATA LOCAL INFILE '#{sqlfile}' INTO TABLE exhibits")
@@ -163,7 +164,7 @@ if sqlfile && File.exists?(sqlfile)
 else
 
 
-  printf '\nGenerating data for benchmarking...\n'
+  printf 'Generating data for benchmarking...'
 
   # pre-compute the insert statements and fake data compilation,
   # so the benchmarks below show the actual runtime for the execute
@@ -191,23 +192,19 @@ else
     )
   end
 
-  TIMES = ENV.key?('x') ? ENV['x'].to_i : 10000
-
-  if sqlfile
     answer = nil
+
     until answer && answer[/\A(?:y(?:es)?|no?)\b/i]
       print("Would you like to dump data into #{sqlfile} (for faster setup)? [Yn]");
-      STDOUT.flush
-      answer = gets.chomp
+
+      answer = STDIN.gets.chomp
     end
 
     if [ 'y', 'yes' ].include?(answer.downcase)
       FileUtils.mkdir_p(File.dirname(sqlfile))
-      #adapter.execute("SELECT * INTO OUTFILE '#{sqlfile}' FROM exhibits;")
       `#{mysqldump_bin.first} -u #{c[:username]} #{"-p#{c[:password]}" unless c[:password].blank?} #{c[:database]} exhibits users > #{sqlfile}`
       puts "File saved\n"
     end
-  end
 end
 
 
