@@ -1,5 +1,15 @@
 #!/usr/bin/env ruby -Ku
 
+if ARGV.length < 2
+  puts 'Usage ruby performance.rb <Username> <Password> <Number of tasks>'
+  puts 'Default task number is 10000'
+  exit
+else
+  @username = ARGV[0]
+  @password = ARGV[1]
+  TIMES = ARGV[2].to_i ||= 10000
+end
+
 #standard libs
 require 'rubygems'
 require 'fileutils'
@@ -8,27 +18,40 @@ require 'benchmark'
 
 
 #other gems
-gem 'addressable',  '~> 2.1'
+gem 'addressable',  '~> 2.2.6'
 gem 'faker',        '~> 0.9.5'
 
 require 'addressable/uri'
 require 'faker'
 
 
-#ActiveRecord
-gem 'activerecord', '~> 3.0.9'
-require 'active_record'
+#mysql
+gem 'mysql2', '< 0.3'
+require 'mysql2'
 
+#ActiveRecord
+gem 'activerecord', '~> 3.0.10'
+require 'active_record'
 
 
 
 #DataMapper
 gem 'dm-migrations'
 gem 'dm-transactions'
-#dm-core form local storage
-require File.expand_path(File.join(File.dirname(__FILE__), '..', 'lib', 'dm-core'))
+require 'dm-transactions'
+
+#File.expand_path(File.join(File.dirname(__FILE__), '..', 'lib', 'dm-core'))
+path = File.expand_path(File.join(File.dirname(__FILE__), '..', 'lib', 'dm-core'))
+if File.exists? path
+  require path
+else
+  require 'dm-core'
+end
+#require File.expand_path(File.join(File.dirname(__FILE__), '..', 'lib', 'dm-core')) ||='dm-core'
 
 require 'dm-migrations'
+require 'dm-mysql-adapter'
+
 
 socket_file = Pathname.glob(%w[
   /opt/local/var/run/mysql5/mysqld.sock
@@ -38,12 +61,12 @@ socket_file = Pathname.glob(%w[
   /tmp/mysql.sock
   /var/mysql/mysql.sock
   /var/run/mysqld/mysqld.sock
-]).find { |path| path.socket? }
+  ]).find { |path| path.socket? }
 
 configuration_options = {
-  :adapter => 'mysql',
-  :username => 'root',
-  :password => 'secret',
+  :adapter => 'mysql2',
+  :username => @username,
+  :password => @password,
   :database => 'dm_core_test'
 }
 
@@ -59,16 +82,17 @@ ActiveRecord::Base.logger.level = 0
 
 
 begin
- puts "Connecting to mysql with ActiveRecord ..."
- ActiveRecord::Base.establish_connection(configuration_options)
- puts "Check database #{configuration_options[:database]}"
- ActiveRecord::Base.connection
+  puts "Connecting to mysql with ActiveRecord ..."
+  ActiveRecord::Base.establish_connection(configuration_options)
+  puts "Connect to database #{configuration_options[:database]}"
+  #ActiveRecord::Base.connection
 rescue
- puts "Please check your mysql server or check existence of the database #{configuration_options[:database]}"
- exit 
-end 
+  puts "Please check your mysql server or check existence of the database #{configuration_options[:database]}"
+  exit
+end
 
 
+configuration_options[:adapter]="mysql"
 
 DataMapper::Logger.new(log_dir+'dm.log', :off)
 adapter = DataMapper.setup(:default, configuration_options)
@@ -141,7 +165,10 @@ if sqlfile && File.exists?(sqlfile)
   puts "Found data-file. Importing from #{sqlfile}"
   #adapter.execute("LOAD DATA LOCAL INFILE '#{sqlfile}' INTO TABLE exhibits")
   `#{mysql_bin.first} -u #{c[:username]} #{"-p#{c[:password]}" unless c[:password].blank?} #{c[:database]} < #{sqlfile}`
+
 else
+
+
   puts 'Generating data for benchmarking...'
 
   # pre-compute the insert statements and fake data compilation,
@@ -154,7 +181,7 @@ else
   today = Date.today
 
   puts "Inserting #{TIMES} users and exhibits..."
-  Times.times do
+  TIMES.times do
     user = User.create(
       :created_on => today,
       :name       => Faker::Name.name,
@@ -169,7 +196,9 @@ else
       :zoo_id     => rand(10).ceil
     )
   end
-  
+
+  TIMES = ENV.key?('x') ? ENV['x'].to_i : 10000
+
   if sqlfile
     answer = nil
     until answer && answer[/\A(?:y(?:es)?|no?)\b/i]
@@ -187,180 +216,174 @@ else
   end
 end
 
-TIMES = ENV.key?('x') ? ENV['x'].to_i : 10_000
-
-puts 'You can specify how many times you want to run the benchmarks with rake:perf x=(number)'
-puts 'Some tasks will be run 10 and 1000 times less than (number)'
-puts "Benchmarks will now run #{TIMES} times"
-
 
 puts "Begin Benchmark 1:"
 Benchmark.bmbm do |x|
-      x.report("Datamapper.get(1):") {
-	TIMES.times do
-		Exhibit.get(1)
-	end
-      }
-      x.report("ActiveRecord.find(1):") { 
-	TIMES.times do
-		ARExhibit.find(1)
-	end
-      }
+  x.report("Datamapper.get(1):") {
+    TIMES.times do
+      Exhibit.get(1)
+    end
+  }
+  x.report("ActiveRecord.find(1):") {
+    TIMES.times do
+      ARExhibit.find(1)
+    end
+  }
 end
 puts "End Benchmark 1"
 puts "Begin Benchmark 2:"
 Benchmark.bmbm do |x|
-      x.report("Datamapper.new:") {
-	TIMES.times do
-		Exhibit.new
-	end
-      }
-      x.report("ActiveRecord.new:") { 
-	TIMES.times do
-		ARExhibit.new
-	end
-      }
+  x.report("Datamapper.new:") {
+    TIMES.times do
+      Exhibit.new
+    end
+  }
+  x.report("ActiveRecord.new:") {
+    TIMES.times do
+      ARExhibit.new
+    end
+  }
 end
 puts "End Benchmark 2"
 puts "Begin Benchmark 3:"
 Benchmark.bmbm do |x|
-       attrs = { :name => 'sam', :zoo_id => 1 }
-       x.report("Datamapper.new(attr):") {
-	TIMES.times do
-		Exhibit.new(attrs = { :name => 'sam', :zoo_id => 1 })
-	end
-      }
-      x.report("ActiveRecord.new(attr):") { 
-	TIMES.times do
-		ARExhibit.new(attrs = { :name => 'sam', :zoo_id => 1 })
-	end
-      }
+  attrs = { :name => 'sam', :zoo_id => 1 }
+  x.report("Datamapper.new(attr):") {
+    TIMES.times do
+      Exhibit.new(attrs = { :name => 'sam', :zoo_id => 1 })
+    end
+  }
+  x.report("ActiveRecord.new(attr):") {
+    TIMES.times do
+      ARExhibit.new(attrs = { :name => 'sam', :zoo_id => 1 })
+    end
+  }
 end
 puts "End Benchmark 3"
 puts "Begin Benchmark 4:"
 Benchmark.bmbm do |x|
-       x.report("touch DataMapper.get(1):") {
-	TIMES.times do
-		touch_attributes(Exhibit.get(1))		
-	end
-      }
-      x.report("touch ActiveRecord.find(1):") { 
-	TIMES.times do
-		touch_attributes(ARExhibit.find(1))
-	end
-      }
+  x.report("touch DataMapper.get(1):") {
+    TIMES.times do
+      touch_attributes(Exhibit.get(1))
+    end
+  }
+  x.report("touch ActiveRecord.find(1):") {
+    TIMES.times do
+      touch_attributes(ARExhibit.find(1))
+    end
+  }
 end
 puts "End Benchmark 4"
 puts "Begin Benchmark 5:"
 Benchmark.bmbm do |x|
-       x.report("Datamapper.all(:limit => 100):") {
-	TIMES.times do
-		touch_attributes(Exhibit.all(:limit => 100))		
-	end
-      }
-      x.report("ActiveRecord.find(:all, :limit => 100):") { 
-	TIMES.times do
-		touch_attributes(ARExhibit.find(:all, :limit => 100))
-	end
-      }
+  x.report("Datamapper.all(:limit => 100):") {
+    TIMES.times do
+      touch_attributes(Exhibit.all(:limit => 100))
+    end
+  }
+  x.report("ActiveRecord.find(:all, :limit => 100):") {
+    TIMES.times do
+      touch_attributes(ARExhibit.find(:all, :limit => 100))
+    end
+  }
 end
 puts "End Benchmark 5"
 puts "Begin Benchmark 6:"
 Benchmark.bmbm do |x|
-       x.report("Datamapper.all(:limit => 100) with relation:") {
-	TIMES.times do
-		touch_attributes(Exhibit.all(:limit => 100))		
-	end
-      }
-      x.report("ActiveRecord.find(:all, :limit => 100) with relation:") { 
-	TIMES.times do
-		touch_attributes(ARExhibit.find(:all, :limit => 100, :include => [ :user ]))
-	end
-      }
+  x.report("Datamapper.all(:limit => 100) with relation:") {
+    TIMES.times do
+      touch_attributes(Exhibit.all(:limit => 100))
+    end
+  }
+  x.report("ActiveRecord.find(:all, :limit => 100) with relation:") {
+    TIMES.times do
+      touch_attributes(ARExhibit.find(:all, :limit => 100, :include => [ :user ]))
+    end
+  }
 end
 puts "End Benchmark 6"
 
 exhibit = {
-    :name       => Faker::Company.name,
-    :zoo_id     => rand(10).ceil,
-    :notes      => Faker::Lorem.paragraphs.join($/),
-    :created_on => Date.today
-  }
+  :name       => Faker::Company.name,
+  :zoo_id     => rand(10).ceil,
+  :notes      => Faker::Lorem.paragraphs.join($/),
+  :created_on => Date.today
+}
 
 puts "Begin Benchmark 7:"
 Benchmark.bmbm do |x|
-       x.report("Datamapper.create:") {
-	TIMES.times do
-		Exhibit.create(exhibit)		
-	end
-      }
-      x.report("ActiveRecord.create:") { 
-	TIMES.times do
-		ARExhibit.create(exhibit)
-	end
-      }
+  x.report("Datamapper.create:") {
+    TIMES.times do
+      Exhibit.create(exhibit)
+    end
+  }
+  x.report("ActiveRecord.create:") {
+    TIMES.times do
+      ARExhibit.create(exhibit)
+    end
+  }
 end
 puts "End Benchmark 7"
 
 puts "Begin Benchmark 8:"
 Benchmark.bmbm do |x|
-      attrs_first  = { :name => 'sam', :zoo_id => 1 }
-      attrs_second = { :name => 'tom', :zoo_id => 1 }
-       x.report("Datamapper.new.attributes=:") {
-	TIMES.times do
-		exhibit = Exhibit.new(attrs_first)
-		exhibit.attributes = attrs_second		
-	end
-      }
-      x.report("ActiveRecord.new.attributes=:") { 
-	TIMES.times do
-		exhibit = ARExhibit.new(attrs_first)
-		exhibit.attributes = attrs_second
-	end
-      }
+  attrs_first  = { :name => 'sam', :zoo_id => 1 }
+  attrs_second = { :name => 'tom', :zoo_id => 1 }
+  x.report("Datamapper.new.attributes=:") {
+    TIMES.times do
+      exhibit = Exhibit.new(attrs_first)
+      exhibit.attributes = attrs_second
+    end
+  }
+  x.report("ActiveRecord.new.attributes=:") {
+    TIMES.times do
+      exhibit = ARExhibit.new(attrs_first)
+      exhibit.attributes = attrs_second
+    end
+  }
 end
 puts "End Benchmark 8"
 puts "Begin Benchmark 9:"
 Benchmark.bmbm do |x|
-      x.report("Datamapper.update:") {
-	TIMES.times do
-		Exhibit.get(1).update(:name => 'bob')		
-	end
-      }
-      x.report("ActiveRecord.update:") { 
-	TIMES.times do
-		ARExhibit.find(1).update_attributes(:name => 'bob')
-	end
-      }
+  x.report("Datamapper.update:") {
+    TIMES.times do
+      Exhibit.get(1).update(:name => 'bob')
+    end
+  }
+  x.report("ActiveRecord.update:") {
+    TIMES.times do
+      ARExhibit.find(1).update_attributes(:name => 'bob')
+    end
+  }
 end
 
 puts "Begin Benchmark 10:"
 Benchmark.bmbm do |x|
-      n=TIMES/2.ceil.to_i	
-      x.report("Datamapper.destroy") {
-	n.times do
-		Exhibit.first.destroy		
-	end
-      }
-      x.report("ActiveRecord.destroy:") { 
-	n.times do
-		ARExhibit.first.destroy
-	end
-      }
+  n=TIMES/2.ceil.to_i
+  x.report("Datamapper.destroy") {
+    n.times do
+      Exhibit.first.destroy
+    end
+  }
+  x.report("ActiveRecord.destroy:") {
+    n.times do
+      ARExhibit.first.destroy
+    end
+  }
 end
 puts "End Benchmark 10"
 puts "Begin Benchmark 11:"
 Benchmark.bmbm do |x|
-      x.report("Datamapper.transaction.new") {
-	TIMES.times do
-		Exhibit.transaction { Exhibit.new }	
-	end
-      }
-      x.report("ActiveRecord.transaction.new:") { 
-	TIMES.times do
-		ARExhibit.transaction { ARExhibit.new } 
-	end
-      }
+  x.report("Datamapper.transaction.new") {
+    TIMES.times do
+      Exhibit.transaction { Exhibit.new }
+    end
+  }
+  x.report("ActiveRecord.transaction.new:") {
+    TIMES.times do
+      ARExhibit.transaction { ARExhibit.new }
+    end
+  }
 end
 puts "End Benchmark 11"
 
