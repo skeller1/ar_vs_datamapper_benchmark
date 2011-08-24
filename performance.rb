@@ -1,8 +1,11 @@
 #!/usr/bin/env ruby -Ku
 
 if ARGV.length < 2
+
+  puts '#################################################################'
   puts 'Usage ruby performance.rb <Username> <Password> <Number of tasks>'
   puts 'Default task number is 10000'
+  puts '#################################################################'
   exit
 else
   @username = ARGV[0]
@@ -17,30 +20,17 @@ require 'logger'
 require 'benchmark'
 
 
-#other gems
-gem 'addressable',  '~> 2.2.6'
-gem 'faker',        '~> 0.9.5'
-
+#test data
 require 'addressable/uri'
 require 'faker'
 
-
-#mysql
-gem 'mysql2', '< 0.3'
-require 'mysql2'
-
 #ActiveRecord
-gem 'activerecord', '~> 3.0.10'
 require 'active_record'
 
 
 
-#DataMapper
-gem 'dm-migrations'
-gem 'dm-transactions'
-require 'dm-transactions'
 
-#File.expand_path(File.join(File.dirname(__FILE__), '..', 'lib', 'dm-core'))
+#use local dm core file if exist, comes from the original script in dm core
 path = File.expand_path(File.join(File.dirname(__FILE__), '..', 'lib', 'dm-core'))
 if File.exists? path
   require path
@@ -48,6 +38,10 @@ else
   require 'dm-core'
 end
 #require File.expand_path(File.join(File.dirname(__FILE__), '..', 'lib', 'dm-core')) ||='dm-core'
+
+#DataMapper
+require 'dm-transactions'
+require 'dm-migrations'
 
 require 'dm-migrations'
 require 'dm-mysql-adapter'
@@ -82,9 +76,9 @@ ActiveRecord::Base.logger.level = 0
 
 
 begin
-  puts "Connecting to mysql with ActiveRecord ..."
+  printf "\n Connecting to mysql with ActiveRecord ...\n"
   ActiveRecord::Base.establish_connection(configuration_options)
-  puts "Connect to database #{configuration_options[:database]}"
+  printf "\n Connect to database #{configuration_options[:database]}\n"
   #ActiveRecord::Base.connection
 rescue
   puts "Please check your mysql server or check existence of the database #{configuration_options[:database]}"
@@ -162,14 +156,14 @@ c = configuration_options
 
 if sqlfile && File.exists?(sqlfile)
 
-  puts "Found data-file. Importing from #{sqlfile}"
+  printf "\nFound data-file. Importing from #{sqlfile}\n"
   #adapter.execute("LOAD DATA LOCAL INFILE '#{sqlfile}' INTO TABLE exhibits")
   `#{mysql_bin.first} -u #{c[:username]} #{"-p#{c[:password]}" unless c[:password].blank?} #{c[:database]} < #{sqlfile}`
 
 else
 
 
-  puts 'Generating data for benchmarking...'
+  printf '\nGenerating data for benchmarking...\n'
 
   # pre-compute the insert statements and fake data compilation,
   # so the benchmarks below show the actual runtime for the execute

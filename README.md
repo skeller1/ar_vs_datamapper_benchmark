@@ -4,7 +4,9 @@ Active Record vs. Datamapper
 This is a simple script to benchmark Active Record and DataMapper.
 It's a updated version of the dm-core performance.rb script.
 
+## Requirements
 
+* [Bundler](http://gembundler.com)
 
 Usage
 -------
