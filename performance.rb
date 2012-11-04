@@ -21,7 +21,6 @@ require 'benchmark'
 
 
 #test data
-require 'addressable/uri'
 require 'faker'
 
 #ActiveRecord
@@ -79,7 +78,7 @@ begin
   printf "\n Connecting to mysql with ActiveRecord ...\n"
   ActiveRecord::Base.establish_connection(configuration_options)
   printf "\n Connect to database #{configuration_options[:database]}\n"
-  #ActiveRecord::Base.connection
+  ActiveRecord::Base.connection
 rescue
   puts "Please check your mysql server or check existence of the database #{configuration_options[:database]}"
   exit
@@ -91,6 +90,7 @@ configuration_options[:adapter]="mysql"
 DataMapper::Logger.new(log_dir+'dm.log', :off)
 adapter = DataMapper.setup(:default, configuration_options)
 
+
 if configuration_options[:adapter]
   sqlfile       = File.absolute_path File.join(File.dirname(File.expand_path(__FILE__)), 'tmp', 'performance.sql')
   mysql_bin     = %w[ mysql mysql5 ].select { |bin| `which #{bin}`.length > 0 }
@@ -99,13 +99,13 @@ end
 
 
 class ARExhibit < ActiveRecord::Base #:nodoc:
-  set_table_name 'exhibits'
+  self.table_name = 'exhibits'
 
   belongs_to :user, :class_name => 'ARUser', :foreign_key => 'user_id'
 end
 
 class ARUser < ActiveRecord::Base #:nodoc:
-  set_table_name 'users'
+  self.table_name = 'users'
 
   has_many :exhibits, :foreign_key => 'user_id'
 end
@@ -171,7 +171,7 @@ else
   # method, minus the setup steps
 
   # Using the same paragraph for all exhibits because it is very slow
-  # to generate unique paragraphs for all exhibits.
+  # to generate udm-mysql-adapternique paragraphs for all exhibits.
   notes = Faker::Lorem.paragraphs.join($/)
   today = Date.today
 
@@ -209,6 +209,8 @@ end
 
 
 puts "Begin Benchmark 1:"
+
+p Exhibit.class
 Benchmark.bmbm do |x|
   x.report("Datamapper.get(1):") {
     TIMES.times do
@@ -255,6 +257,15 @@ puts "Begin Benchmark 4:"
 Benchmark.bmbm do |x|
   x.report("touch DataMapper.get(1):") {
     TIMES.times do
+
+      touch_attributes = lambda do |exhibits|
+        [*exhibits].each do |exhibit|
+          exhibit.id
+          exhibit.name
+          exhibit.created_on
+        end
+      end
+
       touch_attributes(Exhibit.get(1))
     end
   }
@@ -379,8 +390,7 @@ end
 puts "End Benchmark 11"
 
 connection = adapter.send(:open_connection)
-command = connection.create_command('DROP TABLE exhibits')
-command = connection.create_command('DROP TABLE users')
-command.execute_non_query rescue nil
+adapter.execute('DROP TABLE exhibits')
+adapter.execute('DROP TABLE users')
 connection.close
 
