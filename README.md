@@ -7,14 +7,15 @@ It's a updated version of the dm-core performance.rb script.
 ## Requirements
 
 * [Bundler](http://gembundler.com)
+* Database is MySQL
 
 Usage
 -------
 
-    ruby performance.rb <username> <password> <number of records>
+    ruby performance.rb <username> <password> <database name> <number of records>
 
 
 
 Benchmarks
 -----------
- There are 10 different benchmarks
+ There are 11 different benchmarks

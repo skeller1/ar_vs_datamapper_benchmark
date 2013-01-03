@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby -Ku
 
-if ARGV.length < 2
+if ARGV.length < 3
 
   puts '#################################################################'
   puts 'Usage ruby performance.rb <Username> <Password> <Number of tasks>'
@@ -10,7 +10,8 @@ if ARGV.length < 2
 else
   @username = ARGV[0]
   @password = ARGV[1]
-  TIMES = ARGV[2].to_i ||= 10000
+  @pdatabase = ARGV[2]
+  TIMES = ARGV[3].to_i ||= 10000
 end
 
 #standard libs
@@ -60,7 +61,7 @@ configuration_options = {
   :adapter => 'mysql2',
   :username => @username,
   :password => @password,
-  :database => 'dm_core_test'
+  :database => @pdatabase
 }
 
 configuration_options[:socket] = socket_file unless socket_file.nil?

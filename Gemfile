@@ -10,7 +10,7 @@ gem 'data_objects'
 
 #active record
 gem 'activerecord'
-
+gem  'activerecord-mysql2-adapter'
 
 #test data
 gem 'faker'
