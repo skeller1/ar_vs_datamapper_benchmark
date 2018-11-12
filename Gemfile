@@ -9,9 +9,9 @@ gem 'data_objects'
 
 
 #active record
-gem 'activerecord'
+gem 'activerecord', '>= 3.2.11'
 gem  'activerecord-mysql2-adapter'
 
 #test data
-gem 'faker'
+gem 'faker', '>= 1.1.2'
 
